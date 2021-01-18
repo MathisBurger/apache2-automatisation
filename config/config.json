@@ -1,0 +1,10 @@
+{
+  "allowed-origins": "127.0.0.1",
+  "application-port": "8080",
+  "database":{
+    "username": "<username>",
+    "password": "<password>",
+    "host": "<ip>:<port>",
+    "database": "<database>"
+  }
+}
