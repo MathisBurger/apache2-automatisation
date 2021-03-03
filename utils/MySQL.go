@@ -6,6 +6,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+// gets mysql connection
 func GetConn() (conn *sql.DB) {
 	cfg, err := config.ParseConfig()
 	if err != nil {
