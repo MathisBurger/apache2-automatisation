@@ -18,6 +18,7 @@ type Config struct {
 	Database        Database `json:"database"`
 }
 
+// parses config
 func ParseConfig() (c *Config, err error) {
 	f, err := os.Open("/root/automatisation/InstallationService/config/config.json")
 	if err != nil {

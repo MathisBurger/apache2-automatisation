@@ -22,7 +22,10 @@ type pwdStruct struct {
 	Password string `json:"password"`
 }
 
+// controller to configure wordpress installation on apache2
 func ConfigureWordpressController(c *fiber.Ctx) error {
+
+	// check custom cors
 	if !utils.CheckCORS(c.IP()) {
 		return c.JSON(configureWordpressResponse{
 			"Your origin is not allowed",
@@ -31,11 +34,15 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 			"None",
 		})
 	}
+
 	domain := c.Query("domain")
 	AuftragsID := c.Query("AuftragsID")
+
+	// define paths
 	docPath := "/var/www/" + domain
 	cfgPath := "/etc/apache2/sites-available/" + domain + ".conf"
 
+	// create config path if not exists
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		_, err := os.Create(cfgPath)
 		if err != nil {
@@ -47,6 +54,8 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 			})
 		}
 	}
+
+	// create document root if not exists
 	if _, err := os.Stat(docPath); os.IsNotExist(err) {
 		err := os.Mkdir(docPath, 0755)
 		if err != nil {
@@ -60,6 +69,8 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 	}
 
 	conn := utils.GetConn()
+
+	// counting number of databases
 	stmt, err := conn.Prepare("SELECT `ID` FROM `active_databases` WHERE `Name` LIKE ?;")
 	if err != nil {
 		fmt.Println("Error index: 0")
@@ -74,7 +85,10 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 	for resp.Next() {
 		counter += 1
 	}
+
+	// getting database name
 	DatabaseName := NameCalculator(counter, AuftragsID)
+
 	// At this position allowed (will be fixed later)
 	stmt, err = conn.Prepare("CREATE DATABASE " + DatabaseName + ";")
 	if err != nil {
@@ -94,6 +108,8 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 			err.Error(),
 		})
 	}
+
+	// insert new database to database list
 	stmt, err = conn.Prepare("INSERT INTO `active_databases` (`ID`, `Name`, `last-edited`) VALUES (NULL, ?, CURRENT_TIMESTAMP());")
 	if err != nil {
 		return c.JSON(configureWordpressResponse{
@@ -103,7 +119,9 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 			err.Error(),
 		})
 	}
+
 	_, err = stmt.Exec(DatabaseName)
+
 	if err != nil {
 		return c.JSON(configureWordpressResponse{
 			"Error while installing wordpress",
@@ -112,10 +130,15 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 			err.Error(),
 		})
 	}
+
+	// copies wordpress installation to document root
 	utils.Copy("/var/www/software/wordpress", docPath)
+
+	// writes config
 	data, _ := ioutil.ReadFile("/root/automatisation/InstallationService/sample/wordpress.conf")
 	modified := []byte(strings.ReplaceAll(string(data), "{{DOMAIN}}", domain))
 	err = ioutil.WriteFile(cfgPath, modified, 0644)
+
 	if err != nil {
 		return c.JSON(configureWordpressResponse{
 			"Error while installing wordpress",
@@ -125,6 +148,8 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 		})
 	}
 	stmt.Close()
+
+	// configures config.php in installation (mysql credentials)
 	Configure_WR_Config(conn, DatabaseName, docPath)
 	conn.Close()
 	return c.JSON(configureWordpressResponse{
@@ -135,6 +160,7 @@ func ConfigureWordpressController(c *fiber.Ctx) error {
 	})
 }
 
+// calculates database name
 func NameCalculator(counter int, AuftragsID string) string {
 	index := counter + 1
 	resp := "aaa_" + AuftragsID + "_"
@@ -145,6 +171,7 @@ func NameCalculator(counter int, AuftragsID string) string {
 	}
 }
 
+// configures wr-config.php for installation
 func Configure_WR_Config(conn *sql.DB, DatabaseName, docPath string) {
 	data, _ := ioutil.ReadFile("/root/automatisation/InstallationService/sample/wordpress.php")
 	dbuser := "aaa_" + strings.Split(DatabaseName, "_")[1]
